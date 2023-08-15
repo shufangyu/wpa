@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>ReEncFile</title>
+
+    <!-- 引入Axios-->
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <!--PRE-->
+    <script type="text/javascript" src="./build/bundleEff.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.3.4/web3.min.js"></script>
+</head>
+
+<body>
+    <h1>PRE</h1>
+
+    <p>我的地址：<span id="my_address"></span></p>
+    <p>我的餘額：<span id="my_balance"></span></p>
+    <p>合約地址：<span id="cont_address"></span></p>
+    <hr />
+
+    <hr />
+    <p>取得Event資料:</p>
+    <p>Rekey_ID:<span id="get_rid"></span></p>
+    <p>Requester_ID:<span id="get_requester_id"></span></p>
+    <p>File_ID:<span id="get_file_id"></span></p>
+    <p>IPFSpath:<span id="get_Encpath"></span></p>
+    <p>Rekey:<span id="get_rekey"></span></p>
+    <br />
+
+    <hr />
+    <p>取得ReEncFile資料:</p>
+    <p>Requester_ID:<span id="get_requester_id1"></span></p>
+    <p>File_ID:<span id="get_file_id1"></span></p>
+    <p>File_name:<span id="get_file_name"></span></p>
+    <p>IPFSpath:<span id="get_ReEncpath"></span></p>
+    <button id="get" onclick="getReEnc()">取得資料</button>
+    <br />
+
+
+    <script>
+        //PRE參數設定
+        const PRE = EFFPRE.PRE;
+        const PREClient = EFFPRE.PREClient;
+        const PREProxy = EFFPRE.PREProxy;
+        const L0 = 32; // longest byte size can be encrypted
+        const L1 = 16; // customized length
+        PRE.init(L0, L1, PRE.CURVE.SECP256K1);
+
+        if (window.ethereum) {
+            window.ethereum.request({ method: 'eth_requestAccounts' });
+            web3 = new Web3(window.ethereum);
+        }
+        else {
+            // Set the provider you want from Web3.providers
+            web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
+        }
+
+        var myContract;
+        var coinbase;
+
+        async function setContract() {
+            web3.eth.requestAccounts();
+
+            //取得帳號
+            coinbase = await web3.eth.getCoinbase();
+
+            //取得帳號餘額
+            var balance = await web3.eth.getBalance(coinbase);
+            $("#my_address").text(coinbase);
+            $("#my_balance").text(web3.utils.fromWei(balance));  //wei 轉換成 ether web3.utils.fromWei()
+            //合約地址，abi
+            var contract_address = "0x8107CebfAA8b4eD610fA161E32dF8Dc4FA1c8893";
+            var contract_abi = [{ "inputs": [{ "internalType": "address", "name": "_tokenAddress", "type": "address" }], "stateMutability": "nonpayable", "type": "constructor" }, { "anonymous": false, "inputs": [{ "indexed": true, "internalType": "uint256", "name": "Rid", "type": "uint256" }, { "indexed": true, "internalType": "uint256", "name": "requester_id", "type": "uint256" }, { "indexed": true, "internalType": "uint256", "name": "file_id", "type": "uint256" }, { "indexed": false, "internalType": "string", "name": "ipfspath", "type": "string" }, { "indexed": false, "internalType": "string", "name": "rekey", "type": "string" }], "name": "ReEnc", "type": "event" }, { "inputs": [{ "internalType": "uint256", "name": "_amount", "type": "uint256" }], "name": "send_token", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }, { "internalType": "uint256", "name": "re_id", "type": "uint256" }, { "internalType": "uint256", "name": "f_id", "type": "uint256" }, { "internalType": "string", "name": "filename", "type": "string" }, { "internalType": "string", "name": "ipfspath", "type": "string" }], "name": "set_Refile", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }, { "internalType": "uint256", "name": "up_id", "type": "uint256" }, { "internalType": "string", "name": "filename", "type": "string" }, { "internalType": "string", "name": "bf", "type": "string" }, { "internalType": "string", "name": "hash", "type": "string" }, { "internalType": "string", "name": "ipfspath", "type": "string" }, { "internalType": "address", "name": "to", "type": "address" }, { "internalType": "uint256", "name": "tokens", "type": "uint256" }], "name": "setFile", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "Rid", "type": "uint256" }, { "internalType": "uint256", "name": "requester_id", "type": "uint256" }, { "internalType": "uint256", "name": "f_id", "type": "uint256" }, { "internalType": "string", "name": "ipfspath", "type": "string" }, { "internalType": "string", "name": "rekey", "type": "string" }], "name": "setReEncInfo", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }, { "internalType": "string", "name": "pk", "type": "string" }], "name": "setUser", "outputs": [], "stateMutability": "nonpayable", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }], "name": "get_Refile", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "string", "name": "", "type": "string" }, { "internalType": "string", "name": "", "type": "string" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "address", "name": "_address", "type": "address" }], "name": "getBalance", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }], "name": "getFile", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }, { "internalType": "string", "name": "", "type": "string" }, { "internalType": "string", "name": "", "type": "string" }, { "internalType": "string", "name": "", "type": "string" }, { "internalType": "string", "name": "", "type": "string" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }], "name": "getUser", "outputs": [{ "internalType": "string", "name": "", "type": "string" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "name": "info", "outputs": [{ "internalType": "uint256", "name": "uploader_id", "type": "uint256" }, { "internalType": "string", "name": "fileName", "type": "string" }, { "internalType": "string", "name": "bf", "type": "string" }, { "internalType": "string", "name": "hash", "type": "string" }, { "internalType": "string", "name": "ipfspath", "type": "string" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "name": "Refile", "outputs": [{ "internalType": "uint256", "name": "requester_id", "type": "uint256" }, { "internalType": "uint256", "name": "file_id", "type": "uint256" }, { "internalType": "string", "name": "fileName", "type": "string" }, { "internalType": "string", "name": "ipfspath", "type": "string" }], "stateMutability": "view", "type": "function" }, { "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "name": "user", "outputs": [{ "internalType": "string", "name": "pk", "type": "string" }], "stateMutability": "view", "type": "function" }];
+
+            myContract = new web3.eth.Contract(contract_abi, contract_address);
+            $("#cont_address").text(contract_address);
+
+            //取得合約餘額
+            var balance_contract = await web3.eth.getBalance(contract_address);
+            $("#total_balance").text(web3.utils.fromWei(balance_contract));
+            //監聽合約事件
+            myContract.events.ReEnc({ fromBlock: 11033150 }, function (error, event) {
+                if (error) {
+                    console.log(error);
+                    return;
+                }
+                //console.log(event);
+                //Rekey ID->重新加密後的檔案ID
+                var Rid = event.returnValues.Rid;
+                //Data requester ID
+                var r_id = event.returnValues.requester_id;
+                //原始檔案ID
+                var f_id = event.returnValues.file_id;
+                //IPFS下載路徑
+                var path = event.returnValues.ipfspath;
+                //重新加密密鑰
+                var rekey = event.returnValues.rekey;
+                $("#get_rid").text(Rid);
+                $("#get_requester_id").text(r_id);
+                $("#get_file_id").text(f_id);
+                $("#get_Encpath").text(path);
+                $("#get_rekey").text(rekey);
+                //進行重新加密
+                ReEncData(Rid, r_id, f_id, path, rekey);
+            });
+
+        };
+
+        setContract();
+        async function getOwnerPk(file_id) {
+            // 先找File_Owner是誰
+            var owner_id;
+            await myContract.methods.getFile(file_id).call().then(function (info) {
+                owner_id = info[0];
+            });
+            // 查公鑰
+            return myContract.methods.getUser(owner_id).call().then(function (pk) {
+                return pk;
+            });
+        }
+
+        function ReEncData(rekey_id, requester_id, file_id, path, rekey) {
+            axios({
+                url: 'http://localhost:8000/api/downloadIPFS',
+                method: 'POST',
+                data: { 'path': path },
+            })
+                .then((response) => {
+                    var obj = response.data;
+                    // 取得owner pk
+                    getOwnerPk(file_id).then(pk => {
+                        // 重新加密
+                        EFFPRE.reEncryption(rekey, obj, pk);
+                        // 上傳重新加密後的檔案
+                        UploadReEncData(rekey_id, requester_id, file_id, obj);
+                    });
+                })
+                .catch((error) => console.log(error))
+        }
+        async function UploadReEncData(rekey_id, requester_id, file_id, obj) {
+            //上傳至IPFS(透過後端)
+            var formData = new FormData();
+            var hash;
+            //將重新加密後的物件轉成JSON再轉成Blob
+            formData.append("file", new Blob([JSON.stringify(obj)], { type: 'application/json' }));
+            $.ajax({
+                url: 'http://localhost:8000/api/uploadIPFS',
+                contentType: false,
+                async: false,
+                type: "POST",
+                cache: false,
+                processData: false,
+                data: formData,
+                error: function (response) {
+                    var msg = JSON.stringify(response);
+                    alert("Failed POST");
+                    console.log("FAIL: " + msg);
+                },
+                success: function (response) {
+                    if (response.indexOf("fail") != -1)
+                        alert(response);
+                    else
+                        hash = response;
+                }
+            })
+            //檔名
+            var file_name;
+            //找儲存在區塊鏈中的原始檔名(Data owner上傳時的檔名)
+            await myContract.methods.getFile(file_id).call().then(function (info) {
+                console.log(info);
+                file_name = info[1];
+            });
+            //將重新加密後的檔案與相關資訊寫回合約中
+            myContract.methods.set_Refile(rekey_id, requester_id, file_id, file_name, hash).send({ from: coinbase }).then(function (receipt) {
+                alert("Set Refile successfully");
+            });
+        }
+        //測試用(查重新加密的檔案)
+        function getReEnc() {
+            //重新加密的檔案ID
+            var id = 2;
+            myContract.methods.get_Refile(id).call().then(function (Refile) {
+                $("#get_requester_id1").text(Refile[0]);
+                $("#get_file_id1").text(Refile[1]);
+                $("#get_file_name").text(Refile[2]);
+                $("#get_ReEncpath").text(Refile[3]);
+            });
+        }
+    </script>
+</body>
+
+</html>

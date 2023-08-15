@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+
+	<title>Re-encryption Request</title>
+
+	<meta name="author" content="Yu Shu Fang">
+	<meta name="description" content="">
+	<meta name="keywords" content="">
+	<meta name="color-scheme" content="light dark">
+	<meta name="rating" content="General">
+	<meta name="referrer" content="no-referrer">
+
+	<link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Merriweather+Sans:400,700">
+	<link rel="stylesheet"
+		href="https://fonts.googleapis.com/css?family=Merriweather:400,300,300italic,400italic,700,700italic"
+		type="text/css">
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.css">
+	<link rel="stylesheet" href="css/styles.css">
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@truffle/contract@4.6.24/browser-dist/truffle-contract.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+	<script type="text/javascript" src="./build/bundleEff.js"></script>
+</head>
+
+<body id="page-top">
+	<nav class="navbar navbar-expand-lg navbar-light fixed-top py-3" id="mainNav">
+		<div class="container px-4 px-lg-5">
+			<button class="navbar-toggler navbar-toggler-right" type="button" data-bs-toggle="collapse"
+				data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+				aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+			<div class="collapse navbar-collapse" id="navbarResponsive">
+				<ul class="navbar-nav ms-auto my-2 my-lg-0">
+					<li class="nav-item"><a class="nav-link" href="index.html">Registration</a></li>
+					<li class="nav-item"><a class="nav-link" href="work-performance-review.html">Work Performance
+							Review</a></li>
+					<li class="nav-item"><a class="nav-link" href="oracle.html">Oracle</a></li>
+					<li class="nav-item"><a class="nav-link" href="proxy-re-encryption.html">Proxy Re-encryption</a>
+					</li>
+					</li>
+				</ul>
+			</div>
+		</div>
+	</nav>
+	<header class="masthead">
+		<div class="container px-4 px-lg-5 h-100">
+			<div class="row gx-4 gx-lg-5 h-100 align-items-center justify-content-center text-center">
+				<div class="col-lg-8 align-self-end">
+					<h1 class="text-white font-weight-bold">Re-encryption request </h1>
+
+				</div>
+				<div class="col-lg-8 align-self-baseline">
+				</div>
+			</div>
+		</div>
+	</header>
+
+	<script>
+		var account;
+		var weaFileContractInstance;
+		var web3;
+		async function setContract() {
+			if (window.ethereum) {
+				const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+				web3 = new Web3(window.ethereum)
+				account = accounts[0]
+			}
+			else {
+				web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
+			}
+			var weaFileContractArtifact = await fetch('./build/contracts/WEAFile.json');
+			var weaFileContractArtifactJson = await weaFileContractArtifact.json();
+			var weaFileContract = TruffleContract(weaFileContractArtifactJson);
+			weaFileContract.setProvider(window.ethereum);
+			weaFileContractInstance = await weaFileContract.deployed();
+
+			const PRE = EFFPRE.PRE;
+			const PREClient = EFFPRE.PREClient;
+			const PREProxy = EFFPRE.PREProxy;
+			const L0 = 32; // longest byte size can be encrypted
+			const L1 = 16; // customized length
+			PRE.init(L0, L1, PRE.CURVE.SECP256K1);
+
+			console.time('getCreateReEncryptionKeyRequest');
+			var table = document.getElementById("CreateReEncryptionKeyRequestsTable");
+			var count = await getCreateReEncryptionKeyRequestCount();
+			for (let index = 0; index < count; index++) {
+				var request = await getCreateReEncryptionKeyRequest(index);
+
+				const tr = table.insertRow();
+				var td = tr.insertCell();
+				td.appendChild(document.createTextNode(index));
+				td = tr.insertCell();
+				td.appendChild(document.createTextNode(request["futureEmployer"]));
+				td = tr.insertCell();
+				td.appendChild(document.createTextNode(request["cid"]));
+				td = tr.insertCell();
+				td.appendChild(document.createTextNode(request["isDone"]));
+				td = tr.insertCell();
+				td.innerHTML = '<button class="btn btn-primary btn-xl" button name="sub_' + index + '" onclick="addReEncryptionRequest(' + index + ", '" + request["futureEmployer"] + "')\">Create</button>";
+			};
+			console.timeEnd('getCreateReEncryptionKeyRequest');
+		}
+		setContract();
+
+		function addCreateReEncryptionKeyRequest(cid) {
+			console.time('addCreateReEncryptionKeyRequest');
+			weaFileContractInstance.addCreateReEncryptionKeyRequest(cid, { from: account }).then(function (receipt) {
+				console.timeEnd('addCreateReEncryptionKeyRequest');
+			});
+		}
+
+		function getCreateReEncryptionKeyRequestCount() {
+			return weaFileContractInstance.createReEncryptionKeyRequestCount.call(account, { from: account })
+		}
+
+		function getCreateReEncryptionKeyRequest(index) {
+			return weaFileContractInstance.createReEncryptionKeyRequests.call(account, index, { from: account })
+		}
+
+		async function addReEncryptionRequest(requestIndex, futureEmployer) {
+			console.time('addReEncryptionRequest');
+			var previousEmployerPrivateKey = $("#previousEmployerPrivateKey").val();
+			var futureEmployerPublicKey = await getPublicKey(futureEmployer);
+			var reEncryptionKey = EFFPRE.generateReEncrytionKey(previousEmployerPrivateKey, futureEmployerPublicKey).toString('hex');
+
+			weaFileContractInstance.addReEncryptionRequest(requestIndex, reEncryptionKey, { from: account }).then(function (receipt) {
+				console.timeEnd('addReEncryptionRequest');
+			});
+		}
+
+		function getPublicKey(address) {
+			return weaFileContractInstance.publicKeys.call(address, { from: account })
+		}
+	</script>
+
+	<section class="page-section" id="txt">
+		<div class="container px-4 px-lg-5">
+
+			</br>
+			<div class="row gx-4 gx-lg-5 justify-content-center mb-5" id="divEnc">
+				<div class="table-responsive col-md-3 text-center mt-0">
+					<h3 class="text-center mt-0">Request creation of re-encryption key</h3>
+					<hr class="divider" />
+					</br>
+					<form enctype="multipart/form-data" id="createReEncryptionKeyRequestForm">
+						<div class="form-floating mb-3">
+							<input type="text" class="btn btn-primary justify-content-center" id="cid" name="cid">
+							<ul class="info"></ul>
+						</div>
+						<button class="btn btn-primary btn-xl" id="submitCreateReEncryptionKeyRequest">Create
+							Request</button>
+					</form></br>
+				</div>
+			</div>
+			<script>
+				$("#submitCreateReEncryptionKeyRequest").on("click", function (e) {
+					e.preventDefault();
+					var cid = $("#cid").val();
+					var formData = new FormData($("#createReEncryptionKeyRequestForm")[0]);
+
+					addCreateReEncryptionKeyRequest(cid)
+				})
+			</script>
+			<form>
+				<p>Private Key: <input style="background-color: white;" type="text" id="previousEmployerPrivateKey" name="previousEmployerPrivateKey">
+				</p>
+			</form>
+			<table class="table caption-top" id="CreateReEncryptionKeyRequestsTable">
+				<caption class="h2">Create Re-encryption Key Requests</caption>
+				<thead>
+					<tr>
+						<th scope="col">#</th>
+						<th scope="col">Future Employer</th>
+						<th scope="col">CID</th>
+						<th scope="col">isDone?</th>
+						<th scope="col">Create</th>
+					</tr>
+				</thead>
+			</table>
+		</div>
+		</div>
+	</section>
+	<footer class="bg-light py-5">
+		<div class="container px-4 px-lg-5">
+			<div class="small text-center text-muted">Copyright &copy; 2023 - National Central University</div>
+		</div>
+	</footer>
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.js"></script>
+	<script src="js/scripts.js"></script>
+	<script src="https://cdn.startbootstrap.com/sb-forms-latest.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="" />
+    <meta name="author" content="" />
+    <title>Oracle</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:400,700" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Merriweather:400,300,300italic,400italic,700,700italic"
+        rel="stylesheet" type="text/css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@truffle/contract@4.6.24/browser-dist/truffle-contract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+    <script type="text/javascript" src="./build/bundleEff.js"></script>
+</head>
+
+<body id="page-top">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top py-3" id="mainNav">
+        <div class="container px-4 px-lg-5">
+            <button class="navbar-toggler navbar-toggler-right" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+                aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav ms-auto my-2 my-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Registration</a></li>
+                    <li class="nav-item"><a class="nav-link" href="work-performance-review.html">Work Performance
+                            Review</a></li>
+                    <li class="nav-item"><a class="nav-link" href="re-encryption-request.html">Re-encryption Request</a>
+                    </li>
+                    <li class="nav-item"><a class="nav-link" href="proxy-re-encryption.html">Proxy Re-encryption</a>
+                    </li>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <header class="masthead">
+        <div class="container px-4 px-lg-5 h-100">
+            <div class="row gx-4 gx-lg-5 h-100 align-items-center justify-content-center text-center">
+                <div class="col-lg-8 align-self-end">
+                    <h1 class="text-white font-weight-bold">Oracle</h1>
+
+                </div>
+                <div class="col-lg-8 align-self-baseline">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <script>
+        const PRE = EFFPRE.PRE;
+        const PREClient = EFFPRE.PREClient;
+        const PREProxy = EFFPRE.PREProxy;
+        const L0 = 32; // longest byte size can be encrypted
+        const L1 = 16; // customized length
+        PRE.init(L0, L1, PRE.CURVE.SECP256K1);
+
+        var account;
+        var weaFileContractInstance;
+        var web3;
+        async function setContract() {
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+                web3 = new Web3(window.ethereum)
+                account = accounts[0]
+            }
+            else {
+                web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
+            }
+            var weaFileContractArtifact = await fetch('./build/contracts/WEAFile.json');
+            var weaFileContractArtifactJson = await weaFileContractArtifact.json();
+            var weaFileContract = TruffleContract(weaFileContractArtifactJson);
+            weaFileContract.setProvider(window.ethereum);
+            weaFileContractInstance = await weaFileContract.deployed();
+            weaFileContract.deployed()
+                .then(contractInstance => {
+                    contractInstance.contract.events.ReEncryptionRequest(null, { fromBlock: 0 }, (err, res) => {
+                        if (err) {
+                            throw Error(err)
+                        }
+
+                        var previousEmployer = res.returnValues.previousEmployer
+                        var futureEmployer = res.returnValues.futureEmployer
+                        var cid = res.returnValues.cid
+                        var reEncryptionKey = res.returnValues.reEncryptionKey
+
+                        console.log(`previousEmployer = ${previousEmployer}`)
+                        console.log(`futureEmployer = ${futureEmployer}`)
+                        console.log(`cid = ${cid}`)
+                        console.log(`reEncryptionKey = ${reEncryptionKey}`)
+
+                        reEncrypt(reEncryptionKey.toString(), previousEmployer, futureEmployer, cid)
+                    })
+                })
+                .catch(e => {
+                    console.error('Catastrophic Error!')
+                    console.error(e)
+                })
+        }
+        setContract();
+
+        function reEncrypt(reEncryptionKey, previousEmployer, futureEmployer, cid) {
+            console.time('reEncrypt');
+            axios({
+                url: 'http://localhost:8000/api/downloadFromIpfs',
+                method: 'POST',
+                data: { 'cid': cid },
+            }).then(async (response) => {
+                console.log(response.data)
+                var obj = JSON.parse(response.data);
+                var pe_pk = await weaFileContractInstance.publicKeys.call(previousEmployer, { from: account })
+                console.log(reEncryptionKey)
+                console.log(obj)
+                console.log(pe_pk)
+                EFFPRE.reEncryption(reEncryptionKey, obj, pe_pk);
+                addReEncryptedWorkPerformanceReview(futureEmployer, obj);
+                console.timeEnd('reEncrypt');
+            }).catch((error) => console.log(error))
+        }
+
+        async function addReEncryptedWorkPerformanceReview(futureEmployer, obj) {
+            var formData = new FormData();
+            var cid;
+            formData.append("file", new Blob([JSON.stringify(obj)], { type: 'application/json' }));
+            $.ajax({
+                url: 'http://localhost:8000/api/uploadToIpfs',
+                contentType: false,
+                async: false,
+                type: "POST",
+                cache: false,
+                processData: false,
+                data: formData,
+                error: function (response) {
+                    var msg = JSON.stringify(response);
+                    alert("Failed POST");
+                    console.log("FAIL: " + msg);
+                },
+                success: function (response) {
+                    if (response.indexOf("fail") != -1)
+                        alert(response);
+                    else {
+                        cid = response;
+                        console.time('addReEncryptedWorkPerformanceReview');
+                        weaFileContractInstance.addReEncryptedWorkPerformanceReview(futureEmployer, cid, { from: account }).then(function (receipt) {
+                            console.timeEnd('addReEncryptedWorkPerformanceReview');
+                        });
+                    }
+                }
+            })
+        }
+    </script>
+
+    <section class="page-section" id="txt">
+
+    </section>
+    <footer class="bg-light py-5">
+        <div class="container px-4 px-lg-5">
+            <div class="small text-center text-muted">Copyright &copy; 2023 - National Central University</div>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.js"></script>
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.startbootstrap.com/sb-forms-latest.js"></script>
+</body>
+
+</html>

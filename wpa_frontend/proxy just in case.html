@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" class="app">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Proxy Re-Encryption</title>
+    
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="./build/bundleEff.js"></script>
+</head>
+<style>
+    #obj,
+    #rk,
+    #obj1 {
+        word-break: break-all;
+    }
+</style>
+
+<body class="">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top py-3" id="mainNav">
+        <div class="container px-4 px-lg-5">
+            <button class="navbar-toggler navbar-toggler-right" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+                aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav ms-auto my-2 my-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="work-performance-review.html">Work Performance Review</a></li>
+                    <li class="nav-item"><a class="nav-link" href="re-encryption-request.html">Re-encryption Request</a></li>
+                    <li class="nav-item"><a class="nav-link" href="oracle.html">Oracle</a></li>
+                    <li class="nav-item"><a class="nav-link" href="proxy-re-encryption.html">Proxy Re-encryption</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <button id="gen">Generate key pairs</button>
+    <button id="testRe">Test Re-Encryption</button>
+    <hr>
+
+    <form id="testForm" onsubmit="processFormData(event);">
+        <span>Enter previous employer's public key:</span><input type="text" name="PKA" required><br>
+        <span>Enter previous employer's private key:</span><input type="text" name="SKA" required><br>
+        <span>Enter future employer's public key:</span><input type="text" name="PKB" required><br>
+        <span>Enter future employer's private key:</span><input type="text" name="SKB" required><br>
+        <input type="submit">
+    </form>
+
+    <div style="display:none" id="up">
+        <form enctype="multipart/form-data" id="uploadForm">
+            <div>
+                <input type="file" id="file" name="file">
+                <ul class="info"></ul>
+            </div>
+
+            <button id="submit">Submit(enc)</button>
+            <button id="submitDec">Submit(dec)</button>
+        </form>
+    </div>
+    <h2>Previous employer's public key:</h2>
+    <p id="pk_A"></p>
+    <h2>Previous employer's private key:</h2>
+    <p id="sk_A"></p>
+    <h2>Future employer's public key:</h2>
+    <p id="pk_B"></p>
+    <h2>Future employer's private key:</h2>
+    <p id="sk_B"></p>
+    <h2>Plaintext data:</h2>
+    <p id="data"></p>
+    <h2>Encrypted data:</h2>
+    <p id="obj"></p><button id="downloadBtn">Download File</button>
+    <h2>Re-Encryption key:</h2>
+    <p id="rk"></p>
+    <h2>Re-Encrypted data:</h2>
+    <p id="obj1"></p><button id="downloadBtn1">Download File</button>
+    <h2>Decrypted data:</h2>
+    <p id="decryptData"></p>
+
+    <script>
+        //PRE參數
+        const PRE = EFFPRE.PRE;
+        const PREClient = EFFPRE.PREClient;
+        const PREProxy = EFFPRE.PREProxy;
+        const L0 = 32; // longest byte size can be encrypted
+        const L1 = 16; // customized length
+        PRE.init(L0, L1, PRE.CURVE.SECP256K1);
+
+        function testPRE(data) {
+            // 原始檔案內容:
+            document.getElementById("data").innerHTML = data;
+
+            // 使用Alice的公鑰將檔案加密
+            let obj = EFFPRE.encryptData(pk_A, data);
+            dBtn.style.display = '';
+            down_data = JSON.stringify(obj);
+            fileName = obj['key'];
+            console.log(obj);
+            document.getElementById("obj").innerHTML = JSON.stringify(obj);
+
+            // 產生由"Alice的私鑰"與"Bob的公鑰"產生的重新加密密鑰
+            let rk = EFFPRE.generateReEncrytionKey(sk_A, pk_B);
+            document.getElementById("rk").innerHTML = rk.toString('hex');
+
+            // 進行重新加密
+            EFFPRE.reEncryption(rk, obj, pk_A);
+
+            // 重新加密後的檔案
+            console.log(obj);
+            dBtn1.style.display = '';
+            Re_down_data = JSON.stringify(obj);
+            Re_fileName = obj['key'];
+            document.getElementById("obj1").innerHTML = JSON.stringify(obj);
+
+            // 使用Bob的私鑰解密
+            let decryptData = EFFPRE.decrypt(sk_B, obj);
+            console.log(decryptData);
+            document.getElementById("decryptData").innerHTML = decryptData;
+        }
+        //處理全域變數
+        function processFormData(e) {
+            e.preventDefault();
+            var divup = document.getElementById("up");
+            pk_A = document.getElementsByName("PKA")[0].value;
+            sk_A = document.getElementsByName("SKA")[0].value;
+            pk_B = document.getElementsByName("PKB")[0].value;
+            sk_B = document.getElementsByName("SKB")[0].value;
+            document.getElementById("pk_A").innerHTML = pk_A;
+            document.getElementById("sk_A").innerHTML = sk_A;
+            document.getElementById("pk_B").innerHTML = pk_B;
+            document.getElementById("sk_B").innerHTML = sk_B;
+            divup.style.display = '';
+
+        }
+        function dec(data) {
+            console.log(typeof data);
+            let obj = JSON.parse(data);
+            console.log(typeof obj);
+            console.log(obj);
+
+            // 使用Bob的私鑰解密
+            let decryptData = EFFPRE.decrypt(sk_B, obj);
+            console.log(decryptData);
+            document.getElementById("decryptData").innerHTML = decryptData;
+        }
+        var dBtn = document.getElementById("downloadBtn");
+        var dBtn1 = document.getElementById("downloadBtn1");
+        var fileName;
+        var Re_fileName;
+        var down_data;
+        var Re_down_data;
+        var pk_A;
+        var sk_A;
+        var pk_B;
+        var sk_B;
+        dBtn.style.display = 'none';
+        dBtn1.style.display = 'none';
+        //下載加密檔案
+        document.querySelector('#downloadBtn').addEventListener('click', function () {
+            const url = window.URL.createObjectURL(new Blob([down_data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        //下載重新加密檔案
+        document.querySelector('#downloadBtn1').addEventListener('click', function () {
+            const url = window.URL.createObjectURL(new Blob([Re_down_data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', Re_fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        //隨機產生兩組公私鑰，並進行整個加解密流程
+        $("#gen").on("click", function (e) {
+            e.preventDefault();
+            const A = new PREClient();
+            const B = new PREClient();
+            A.keyGen();
+            B.keyGen();
+            pk_A = A.getPk().toString('hex');
+            sk_A = A.getSk().toString('hex');
+            pk_B = B.getPk().toString('hex');
+            sk_B = B.getSk().toString('hex');
+
+            document.getElementById("pk_A").innerHTML = pk_A;
+            document.getElementById("sk_A").innerHTML = sk_A;
+            document.getElementById("pk_B").innerHTML = pk_B;
+            document.getElementById("sk_B").innerHTML = sk_B;
+            var divup = document.getElementById("up");
+            divup.style.display = '';
+
+            var ip = '10.0.0.1 10.0.0.2';
+            testPRE(ip);
+        });
+
+        var t = new Array();
+        //測試重新加密時間
+        function testReEnc(num) {
+            // 產生Alice的公、私鑰
+            const A = new PREClient();
+            A.keyGen();
+            pk_A = A.getPk().toString('hex');
+            sk_A = A.getSk().toString('hex');
+            var data = '10.1.1.1';
+            var fortime = 0;
+            for (j = 0; j < num; j++) {
+                // 產生Bob的公、私鑰
+                var B = new PREClient();
+                B.keyGen();
+                pk_B = B.getPk().toString('hex');
+                sk_B = B.getSk().toString('hex');
+
+                // 使用Alice的公鑰將檔案加密
+                var obj = EFFPRE.encryptData(pk_A, data);
+                // 產生由"Alice的私鑰"與"Bob的公鑰"產生的重新加密密鑰
+                var rk = EFFPRE.generateReEncrytionKey(sk_A, pk_B);
+                // 進行重新加密
+                var begin = window.performance.now();
+                EFFPRE.reEncryption(rk, obj, pk_A);
+                var end = window.performance.now();
+                var timeSpent = end - begin;
+                fortime += timeSpent;
+            }
+            t.push(fortime);
+            console.log(fortime);
+        };
+        //測試時間
+        $("#testRe").on("click", function (e) {
+            e.preventDefault();
+            //count:測試跑的次數
+            count = 50;
+            for (i = 0; i < count; i++) {
+                //測試重新加密給15個不同人
+                testReEnc(15);
+            }
+            var result = 0;
+            for (i = 0; i < t.length; i++) {
+                result += t[i];
+            }
+            avg = result / t.length;
+            console.log('Average time[' + count + ']:' + avg);
+        });
+        //處理上傳檔案
+        $("#submit").on("click", function (e) {
+            e.preventDefault();
+            var file = $("#file").val();
+            if (file == null || file == "") {
+                alert("請上傳附件!!!");
+            } else {
+                var formData = new FormData($("#uploadForm")[0]);
+                $.ajax({
+                    url: 'http://localhost:8000/api/uploadPRE',
+                    contentType: false,
+                    async: false,
+                    type: "POST",
+                    cache: false,
+                    processData: false,
+                    data: formData,
+                    error: function (response) {
+                        var msg = JSON.stringify(response);
+                        alert("Failed POST");
+                        console.log("FAIL: " + msg);
+                    },
+                    success: function (response) {
+                        if (response.indexOf("格式錯誤") != -1)
+                            alert("格式錯誤");
+                        else {
+                            console.log(typeof response);
+                            console.log(response);
+                            var js = JSON.parse(response);
+                            console.log(typeof js);
+                            console.log(js);
+                            //進行PRE流程
+                            testPRE(js);
+                        }
+                    }
+                })
+            }
+        });
+        //解密上傳的加密檔案
+        $("#submitDec").on("click", function (e) {
+            e.preventDefault();
+            var file = $("#file").val();
+            if (file == null || file == "") {
+                alert("請上傳附件!!!");
+            } else {
+                var formData = new FormData($("#uploadForm")[0]);
+                $.ajax({
+                    url: 'http://localhost:8000/api/uploadPRE',
+                    contentType: false,
+                    async: false,
+                    type: "POST",
+                    cache: false,
+                    processData: false,
+                    data: formData,
+                    error: function (response) {
+                        var msg = JSON.stringify(response);
+                        alert("Failed POST");
+                        console.log("FAIL: " + msg);
+                    },
+                    success: function (response) {
+                        if (response.indexOf("格式錯誤") != -1)
+                            alert("格式錯誤");
+                        else {
+                            console.log(typeof response);
+                            console.log(response);
+                            var js = JSON.parse(response);
+                            console.log(typeof js);
+                            console.log(js);
+                            //解密
+                            dec(js);
+                        }
+                    }
+                })
+            }
+        });
+    </script>
+</body>
+
+</html>

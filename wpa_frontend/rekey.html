@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="" />
+    <meta name="author" content="" />
+    <title>Security Information Share System</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:400,700" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Merriweather:400,300,300italic,400italic,700,700italic"
+        rel="stylesheet" type="text/css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@truffle/contract@4.6.24/browser-dist/truffle-contract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"></script>
+</head>
+
+<body id="page-top">
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top py-3" id="mainNav">
+        <div class="container px-4 px-lg-5">
+            <a class="navbar-brand" href="#page-top">Home</a>
+            <button class="navbar-toggler navbar-toggler-right" type="button" data-bs-toggle="collapse"
+                data-bs-target="#navbarResponsive" aria-controls="navbarResponsive" aria-expanded="false"
+                aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+            <div class="collapse navbar-collapse" id="navbarResponsive">
+                <ul class="navbar-nav ms-auto my-2 my-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="upload.html">Upload</a></li>
+                    <li class="nav-item"><a class="nav-link" href="download.html">Download</a></li>
+                    <li class="nav-item"><a class="nav-link" href="rekey.html">Rekey</a></li>
+                    <li class="nav-item"><a class="nav-link" href="request.html">Request</a></li>
+                    <li class="nav-item"><a class="nav-link" href="javascript:void(0)" onclick="logout()">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <header class="masthead">
+        <div class="container px-4 px-lg-5 h-100">
+            <div class="row gx-4 gx-lg-5 h-100 align-items-center justify-content-center text-center">
+                <div class="col-lg-8 align-self-end">
+                    <h1 class="text-white font-weight-bold">Security Information Share System</h1>
+                    <hr class="divider" />
+                </div>
+                <div class="col-lg-8 align-self-baseline">
+                    <p class="text-white-75 mb-5">Start share your security information</p>
+                    <a class="btn btn-primary btn-xl" href="#Request">Request List</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <section class="page-section" id="Request">
+        <div class="container px-4 px-lg-5">
+            <h2 class="text-center mt-0">Request List</h2>
+            <hr class="divider" />
+            <h3 class="text-center mt-0">Your Public Key</h3>
+            <p class="text-center mt-0" id="pk"></p>
+            </br>
+            <div>
+                <!--顯示表格數據 -->
+                <div class="row gx-4 gx-lg-5 justify-content-center mb-5">
+                    <div class="table-responsive text-center mt-0">
+                        <table class="table caption-top" id="RQTable" border="1">
+                            <caption class="h2">List</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">#</th>
+                                    <th scope="col" style="width:50%;">Public Key</th>
+                                    <th scope="col" style="width:50%;">Rekey</th>
+                                    <th scope="col">Submit</th>
+                                </tr>
+                            </thead>
+                        </table>
+                        <script>
+                            if (!window.sessionStorage.getItem("ID"))
+                                window.location.href = 'index.html';
+                            else {
+                                var id = window.sessionStorage.getItem("ID");
+                                console.log(id);
+                                //取得自己的公鑰
+                                var url = "http://localhost:8000/api/getPK";
+                                axios.get(url, { params: { ID: id } })
+                                    .then((response) => {
+                                        document.getElementById("pk").innerHTML = response.data[0].pk;
+                                    })
+                                    .catch((error) => console.log(error))
+                                //取得需要重新加密的檔案清單
+                                get_Rekeylist(id);
+                            }
+
+                            var coinbase;
+                            var weaFileContractInstance;
+                            var weaTokenContractInstance;
+                            var web3;
+                            async function setContract() {
+                                if (window.ethereum) {
+                                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+                                    web3 = new Web3(window.ethereum)
+                                }
+                                else {
+                                    web3 = new Web3(Web3.givenProvider || "ws://localhost:8545");
+                                }
+                                coinbase = await web3.eth.getCoinbase();
+
+                                var weaTokenContractArtifact = await fetch('./build/contracts/WEAToken.json');
+                                var weaTokenContractArtifactJson = await weaTokenContractArtifact.json();
+                                var weaTokenContract = TruffleContract(weaTokenContractArtifactJson);
+                                weaTokenContract.setProvider(window.ethereum);
+                                weaTokenContractInstance = await weaTokenContract.deployed();
+
+                                var weaFileContractArtifact = await fetch('./build/contracts/WEAFile.json');
+                                var weaFileContractArtifactJson = await weaFileContractArtifact.json();
+                                var weaFileContract = TruffleContract(weaFileContractArtifactJson);
+                                weaFileContract.setProvider(window.ethereum);
+                                weaFileContractInstance = await weaFileContract.deployed();
+                            }
+                            setContract();
+
+                            //顯示資料庫中要重新加密的檔案清單
+                            function show_list(pk_list) {
+                                Object.entries(pk_list).forEach(([key, value]) => {
+                                    console.log(key, value);
+                                });
+
+                                var count = 1;
+                                //取得table元件
+                                var table = document.getElementById("RQTable");
+                                Object.entries(pk_list).forEach(([key, value]) => {
+                                    //取的目前有的td數量
+                                    var num = document.getElementById("RQTable").rows.length;
+                                    //從最後一筆開始加入
+                                    var row = table.insertRow(num);
+                                    var cell = row.insertCell(0);
+                                    var cell1 = row.insertCell(1);
+                                    var cell2 = row.insertCell(2);
+                                    var cell3 = row.insertCell(3);
+                                    cell.innerHTML = '<tbody><tr><th scope="row">' + count + '</th>';
+                                    cell1.innerHTML = '<td>' + value[0] + '</td>';
+                                    cell2.innerHTML = '<td><input class="form-control" type="text" name="rekey_' + key + '" minlength="226" maxlength="226" size="226" required></td>';
+                                    cell3.innerHTML = '<td><button class="btn btn-primary btn-xl" name="sub_' + key + '" onclick=" updateRekey(' + key + ',' + value[1] + ',' + value[2] + ')">Submit</button></td></tr></tbody>';
+                                    count += 1;
+                                });
+                            }
+                            //取得發送給Data owner的Rekey申請
+                            function get_Rekeylist(id) {
+                                var url = "http://localhost:8000/api/getRekeyList";
+                                axios.get(url, { params: { ID: id } })
+                                    .then((response) => {
+                                        console.log(response.data);
+                                        show_list(response.data);
+                                    })
+                                    .catch((error) => console.log(error.response.data))
+                            }
+                            //將Rekey更新到資料庫
+                            function updateRekey(rekey_id, file_id, requester_id) {
+                                var name = 'rekey_' + rekey_id;
+                                var rekey = document.getElementsByName(name)[0].value;
+                                if (!rekey) {
+                                    alert("請輸入Rekey");
+                                } else {
+                                    var url = "http://localhost:8000/api/updateRekey";
+                                    axios.put(url, { ID: rekey_id, Rekey: rekey })
+                                        .then((response) => {
+                                            console.log(response.data);
+                                            document.getElementsByName(name)[0].disabled = true;
+                                            var name_sub = 'sub_' + rekey_id;
+                                            document.getElementsByName(name_sub)[0].disabled = true;
+                                            alert(response.data);
+                                            //產生Blockchain事件
+                                            setEvent(rekey_id, rekey, file_id, requester_id);
+                                        })
+                                        .catch((error) => console.log(error.response.data))
+                                }
+                            }
+                            //取得原有檔案的IPFS下載hash
+                            function get_path(file_id) {
+                                return weaFileContractInstance.getFile.call(file_id).then(function (info) {
+                                    return info[4];
+                                });
+                            }
+                            //產生Blockchain事件
+                            async function setEvent(rekey_id, rekey, file_id, requester_id) {
+                                var path;
+                                //取得原有檔案的IPFS下載hash
+                                await get_path(file_id).then(result => {
+                                    console.log(result);
+                                    path = result;
+                                })
+                                console.time('setReEncInfo');
+                                //產生事件
+                                weaFileContractInstance.setReEncryptedInfo(rekey_id, requester_id, file_id, path, rekey, { from: coinbase }).then(function (receipt) {
+                                    console.timeEnd('setReEncInfo');
+                                    alert("Send request successfully! Waiting for reenc data.");
+                                });
+                            }
+
+                            function logout() {
+                                window.sessionStorage.clear();
+                                alert("Logout");
+                                window.location.href = 'index.html';
+                            }
+                        </script>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-light py-5">
+        <div class="container px-4 px-lg-5">
+            <div class="small text-center text-muted">Copyright &copy; 2021 - National Central University</div>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.js"></script>
+    <script src="js/scripts.js"></script>
+    <script src="https://cdn.startbootstrap.com/sb-forms-latest.js"></script>
+</body>
